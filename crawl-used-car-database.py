@@ -1,49 +1,35 @@
 from selenium import webdriver
-from selenium.webdriver.remote.webdriver import (
-    WebDriver,
-)
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
 
 from bs4 import BeautifulSoup
 from selenium_stealth import stealth
 
 import os
 import csv
-import logging
 import re
 import time
 import datetime
-from enum import Enum
 
-# input: 
-# brand : toyota,...
-# model : yaris,...
-# year : 2019,...
-# TODO: user doesn't need to insert pages limit
+import argparse
 
-# output:
-# car data : brand, model, year, vin id in excel format
+parser = argparse.ArgumentParser(description="Extract car VIN data")
 
-## START: USER INPUT (lower case only)
-# TODO: allow user inputs upper case
-BRAND = "ford"
-MODEL = "fiesta"
-YEAR = 2015
+parser.add_argument("brand", help="Car brand")
+parser.add_argument("model", help="Car model")
+parser.add_argument("year", type=int, help="Car year")
+parser.add_argument("page", type=int, nargs="?", default=1, help="Start page")
+
+args = parser.parse_args()
+
+BRAND = args.brand.lower()
+MODEL = args.model.lower()
+YEAR = args.year
+PAGE = args.page
+
+print(f"Brand: {BRAND}, Model: {MODEL}, Year: {YEAR}, Page: {PAGE}")
+
 BASE_URL = "https://checkcar.vin/vin-decoder/"
-PAGE = 1
-
-## END: USER INPUT
 FULL_URL = f"{BASE_URL}{BRAND}/{MODEL}/{YEAR}"
-
-class LogType(Enum):
-    INFO = "INFO"
-    WARNNING = "WARNNING"
-    ERROR = "ERROR"
-    CRITICAL = "CRITICAL"
-    DEBUG = "DEBUG"
 
 class Category:
     def __init__(self, brand: str, model: str, year: int = -1, page: int = 1):
@@ -71,13 +57,14 @@ class Extactor:
         self.sleep_interval = 1
 
         self.initialize_result_directory()
-        # self.initialize_logging()
         self.initalize_csv()
 
         self.driver_options = webdriver.ChromeOptions()
         self.driver_options.add_argument("start-maximized")
         self.driver_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         self.driver_options.add_experimental_option('useAutomationExtension', False)
+        self.driver_options.add_argument("--headless")
+        self.driver_options.add_argument("--disable-gpu")
 
         self.driver = webdriver.Chrome(options=self.driver_options)
 
@@ -92,8 +79,6 @@ class Extactor:
 
         self.wait = WebDriverWait(self.driver, 10)
 
-        # self.apply_header()
-
         # INITIALIZE
         time.sleep(self.sleep_interval)
 
@@ -105,14 +90,6 @@ class Extactor:
             print(f"Directory '{self.base_path}' already exists.")
         except Exception as e:
             print(f"An error occurred: {e}")
-
-    def initialize_logging(self):
-        logging.basicConfig(
-            # Log file path
-            filename=os.path.join(self.base_path, f"{self.base_path}.log"),
-            level=logging.INFO,  # Set the logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-            format="%(asctime)s - %(levelname)s - %(message)s",
-        )
 
     def initalize_csv(self):
         self.csv_filename = os.path.join(self.base_path, f"{self.base_path}.csv")
@@ -161,11 +138,11 @@ class Extactor:
         self, category: Category
     ):
         if not category:
-            self.log(LogType.ERROR, "Input must be a Category object")
+            print("Input must be a Category object")
             return
 
         if not category.url or len(category.url) == 0:
-            self.log(LogType.ERROR, "Url of category must not be empty string")
+            print("Url of category must not be empty string")
 
         # Access to url of category
         self.get_url(category.url)
